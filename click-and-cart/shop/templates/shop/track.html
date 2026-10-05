@@ -1,0 +1,82 @@
+{% extends 'shop/basic.html'%}
+{% block title %} {% endblock %}
+{% block css %} {% endblock %}
+
+{% block body %}
+
+<div class="container">
+    <div class="col my-2">
+        <h3> Enter Your Order Id and Email address to track your order </h3>
+
+           <form method="POST" action="{% url 'trackingstatus' %}">
+            {% csrf_token %}
+            <div class="row">
+                <div class="form-group col-md-6">
+                    <label for="inputname"> Order Id</label>
+                    <input type="text" class="form-control" id="orderid" name="orderid" placeholder="Order Id">
+                </div>
+                <div class="col-md-6">
+                    <label for="inputEmail4"> Email</label>
+                    <input type="email" class="form-control" id="email" name="gmail" placeholder="Email">
+                </div>
+                <div class="col-md-2 my-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">
+                    Track Order
+                </button>
+            </div>
+            </div>
+    </div>
+    {% if orderupdates %}
+    <div class="col my-2">
+        <h3>Your Order Status :</h3>
+        <div class="my-2">
+             <ul class="list-group" id="items">
+                    {% for i in orderupdates %}
+                        <li class="list-group-item">
+                            <div class="row">
+                                <div class="col-8">{{i.desc}}</div>
+                                <div class="col text-end">{{i.time}}</div>
+                            </div>
+                        </li>
+                    {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+    {% if orderitems %}
+
+    <div class="col my-2">
+        <h3>Your Order Details :</h3>
+        <div class="my-2">
+            <ul class="list-group">
+                <li class="list-group-item">
+                    <div class="row fw-bold">
+                        <div class="col">Name</div>
+                        <div class="col-2 text-center">Quantity</div>
+                        <div class="col-2 text-end">Price ₹</div>
+                        <div class="col-2 text-end">Total ₹</div>
+                    </div>
+                </li>
+            </ul>
+        </div>
+        {% for o in orderitems %}
+        <div class="my-2">
+            <ul class="list-group">
+                <li class="list-group-item">
+                    <div class="row fw-bold">
+                        <div class="col">{{o.name}}</div>
+                        <div class="col-2 text-center">{{o.qty}}</div>
+                        <div class="col-2 text-end">{{o.price}}</div>
+                        <div class="col-2 text-end">{{o.total}}</div>
+                    </div>
+                </li>
+            </ul>
+        </div>
+        {% endfor %}
+       
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}
+{% block js %}{% endblock %}

@@ -1,0 +1,39 @@
+{% extends 'blog/basic.html' %}
+{% block css %}
+<style>
+  .blog-card {
+    height: 300px;
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container my-2">
+  <div class="row mb-2">
+    {% for post in posts %}
+    <div class="col-md-6">
+      <div
+        class="row g-0 border rounded overflow-hidden flex-md-row mb-4 shadow-sm h-md-250 position-relative blog-card">
+        <div class="col p-4 d-flex flex-column position-static"> <strong
+            class="d-inline-block mb-2 text-primary-emphasis">BLOG</strong>
+          <h6 class="mb-0">{{post.title|truncatechars:48}}</h6>
+          <div class="mb-1 text-body-secondary">{{post.time}}</div>
+          <p class="card-text mb-auto">{{post.cont0|truncatewords:20}}</p>
+          <a href="{% url 'blogpost' post.post_id %}" class="icon-link gap-1 icon-link-hover stretched-link">
+            Continue reading
+          </a>
+        </div>
+        <div class="col-auto d-none d-lg-block">
+          <img src="{{ post.img.url }}" width="200" height="100%" style="object-fit: cover;">
+        </div>
+      </div>
+    </div>
+    {% if forloop.counter|divisibleby:2 %}
+  </div>
+  <div class="row mb-2">
+    {% endif %}
+    {% endfor %}
+  </div>
+
+</div>
+{% endblock %}
