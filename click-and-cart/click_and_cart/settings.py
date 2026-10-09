@@ -25,9 +25,22 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-=ecd7&qu+jd9z-44ukioey+e8t_34=!_t0jpooml^h(w!vrg$3'
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # SECURITY WARNING: don't run with debug turned on in production!
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+
+PAYTM_MID = os.getenv("PAYTM_MID")
+PAYTM_MERCHANT_KEY = os.getenv("PAYTM_MERCHANT_KEY")
+PAYTM_WEBSITE=os.getenv("PAYTM_WEBSITE")
+PAYTM_CLIENT_ID = os.getenv("PAYTM_CLIENT_ID", "C11")
 DEBUG = True
 
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
 ALLOWED_HOSTS = []
 
 

@@ -1,16 +1,29 @@
+import paytmchecksum
 from django.shortcuts import render
 from django.http import HttpResponse, JsonResponse
 # from unicodedata import category
 import json
+import razorpay
+from django.views.decorators.csrf import csrf_exempt
+import requests
 
-from .models import product ,contact, orders , orderitems, orderupdate
-from math import ceil
+from django.conf import settings
+from django.views.decorators.csrf import csrf_exempt
+from .models import product,contact, orders, orderupdate, orderitems
+
+
+client = razorpay.Client(
+            auth=(
+                settings.RAZORPAY_KEY_ID,
+                settings.RAZORPAY_KEY_SECRET
+            )
+        )
+
 # Create your views here.
 def index(request):
     # products = product.objects.all()
     # n = len(products)
     # nslides = n//4 + ceil((n/4) + (n//4)
-
     allproducts=[]
     catprod=product.objects.values('category','id')
     cats ={item['category'] for item in catprod}
@@ -35,8 +48,34 @@ def index(request):
     # return render(request,'shop/index.html')
 
 
+def prodmatch(query, item):
+    if query in item.product_name.lower() or query in item.category.lower() or query in item.subcategory.lower() or query in item.product_desc.lower():
+        return 1
+    else: return 0
+
+def search(request):
+    query = request.GET.get('search')
+    allproducts = []
+    catprod = product.objects.values('category', 'id')
+    cats = {item['category'] for item in catprod}
+    for cat in cats:
+        prodcat = product.objects.filter(category=cat)
+        prod = [item for item in prodcat if prodmatch(query.lower(),item)]
+        n = len(prod)
+        nslides = (n + 3) // 4
+        if len(prod) != 0:
+            allproducts.append([prod, range(1, nslides), nslides])
+
+    # allproducts = [[products, range(1, len(products)), nslides],
+    #             [products, range(1, len(products)), nslides]]
+    params = {'allproducts': allproducts, "msg":""}
+    if(len(allproducts) == 0 or len(query) < 4):
+        params['msg'] = "Pls enter a valid query"
+    return render(request, "shop/search.html", params)
+
 def about(request):
     return render(request,'shop/about.html')
+
 
 def contacts(request):
     if request.method=="POST":
@@ -48,8 +87,8 @@ def contacts(request):
         contacts.save()
     return render(request, 'shop/contact.html')
 
-def get_cart_products(request):
 
+def get_cart_products(request):
     ids = request.GET.get("ids","")
     ids = ids.split(",")
 
@@ -98,18 +137,16 @@ def track(request):
 
     return render(request, 'shop/track.html')
 
-def search(request):
-    return render(request,'shop/search.html')
 
 def productview(request,myid):
     prod =product.objects.filter(id=myid)
     return render(request,'shop/productview.html',{'product':prod[0]})
 
+
 def checkout(request):
     if(request.method == "POST"):
         name = request.POST.get("name","")
         gmail = request.POST.get("email","")
-        amount = request.POST.get("amount","")
         address1 = request.POST.get("address1","")
         address2 = request.POST.get("address2","")
         city = request.POST.get("city","")
@@ -118,23 +155,99 @@ def checkout(request):
         phone = request.POST.get("phone","")
         cart = request.POST.get("cart","")
         cart = json.loads(cart)
-        order = orders(name=name, gmail=gmail, address1=address1, address2=address2,amount=amount, city=city, state=state, zip_code=zipcode, phone=phone)
+        status="Pending"
+        order = orders(name=name, gmail=gmail, address1=address1, address2=address2,amount=0, city=city, state=state, zip_code=zipcode, phone=phone,status=status)
         order.save()
 
-        order_updates = orderupdate(order=order, order_desc="Placed")
-        order_updates.save()
+        # order_updates = orderupdate(order=order, order_desc="Pending")
+        # order_updates.save()
+
+        amount = 0
         for id in cart:
             p = product.objects.get(id=id)
             price = p.price
-            name = p # foreign key
+            product_name = p # foreign key
             qty = cart[id]
-            orderitem = orderitems(order=order, product=name, price=price, qty=qty)
+            amount += (price * qty)
+            orderitem = orderitems(order=order, product=product_name, price=price, qty=qty)
             orderitem.save()
-        return render(request, 'shop/checkout.html',{'thank':1, 'id':order.orders_id})
+
+        order.amount = amount
+        order.save()
+
+        razorpay_order = client.order.create({
+                "amount": amount * 100,   # Razorpay uses paise
+                "currency": "INR",
+                "receipt": str(order.orders_id)
+        })
+        print(razorpay_order)
+        print(razorpay_order["id"])
+
+        return render(
+            request,
+            "shop/checkout.html",
+            {
+                'thank': True,
+                "razorpay_key_id": settings.RAZORPAY_KEY_ID,
+                "razorpay_order_id": razorpay_order["id"],
+                "razorpay_amount": amount * 100,
+                "order_id": order.orders_id,
+                "name": name,
+                "gmail": gmail,
+                "phone": phone
+            }
+        )
     return render(request, 'shop/checkout.html')
 
 def backup(request):
     return render(request, 'shop/backup.html')
+
+
+@csrf_exempt
+def handlerequest(request):
+
+    if request.method == "POST":
+
+        data = json.loads(request.body)
+
+        razorpay_payment_id = data.get("razorpay_payment_id")
+        razorpay_order_id = data.get("razorpay_order_id")
+        razorpay_signature = data.get("razorpay_signature")
+        order_id = data.get("order_id")
+
+        try:
+
+            client.utility.verify_payment_signature({
+                "razorpay_order_id": razorpay_order_id,
+                "razorpay_payment_id": razorpay_payment_id,
+                "razorpay_signature": razorpay_signature
+            })
+
+            # Payment is genuinely verified
+            order = orders.objects.get(
+                orders_id=order_id
+            )
+
+            order.status = "Paid"
+            order.save()
+
+            orderupdate.objects.create(
+                order=order,
+                order_desc="Placed"
+            )
+
+            return JsonResponse({
+                "status": "success",
+                "order_id": order.orders_id
+            })
+
+        except Exception as e:
+
+            print("RAZORPAY VERIFICATION ERROR:", e)
+
+            return JsonResponse({
+                "status": "failed"
+            })
 
 
 

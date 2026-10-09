@@ -8,11 +8,11 @@
         <div class="items">
             <ul class="list-group">
                 <li class="list-group-item">
-                <div class="row fw-bold">
-                <div class="col">Name</div>
-                <div class="col-2 text-center">Quantity</div>
-                <div class="col-2 text-end">Price ₹</div>
-                <div class="col-2 text-end">Total ₹</div>
+                    <div class="row fw-bold">
+                        <div class="col">Name</div>
+                        <div class="col-2 text-center">Quantity</div>
+                        <div class="col-2 text-end">Price ₹</div>
+                        <div class="col-2 text-end">Total ₹</div></div>
                 </li>
             </ul>
         </div>
@@ -22,7 +22,6 @@
         <form action="{% url 'checkout' %}" method="post" id="checkoutform">
             {% csrf_token %}
             <input type="hidden" name="cart" id="cartdata">
-            <input type="hidden" name="amount" id="amount">
             <div class="form-row">
                 <div class="form-group col-md-6">
                     <label for="name">Name</label>
@@ -67,8 +66,8 @@
 {% endblock %}
 
 {% block js %}
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script>
-
 function fetch_cart_details(){
     let cart = JSON.parse(localStorage.getItem('cart') || '{}')
     let ids = Object.keys(cart);
@@ -137,13 +136,74 @@ fetch_cart_details();
 
 document.querySelector('#checkoutform').addEventListener('submit', function(){
     let cart = localStorage.getItem('cart');
-    $('#amount').val($('#grandtotal').text().trim());
     document.querySelector('#cartdata').value = cart;
 });
+
 {% if thank %}
-    alert("Thanks for ordering with us. Your order id is {{ id }}. Use it to track your order using our order tracker");
-    localStorage.removeItem('cart')
-    document.location = '/shop/';
+
+
+
+var options = {
+
+    "key": "{{ razorpay_key_id }}",
+
+    "amount": "{{ razorpay_amount }}",
+
+    "currency": "INR",
+
+    "name": "Click & Cart",
+
+    "description": "Order Payment",
+
+    "order_id": "{{ razorpay_order_id }}",
+
+    "handler": function (response) {
+
+        fetch("{% url 'HandleRequest' %}", {
+
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token }}"
+            },
+
+            body: JSON.stringify({
+
+                "razorpay_payment_id": response.razorpay_payment_id,
+
+                "razorpay_order_id": response.razorpay_order_id,
+
+                "razorpay_signature": response.razorpay_signature,
+
+                "order_id": "{{ order_id }}"
+
+            })
+
+        })
+
+        .then(response => response.json())
+
+        .then(data => {
+
+            if (data.status === "success") {
+                localStorage.removeItem("cart");
+                 alert("Order placed successfully!\nYour Order ID is: " + data.order_id);
+                window.location.href = "/";
+            }
+
+        });
+
+    }
+
+};
+
+
+var rzp = new Razorpay(options);
+
+rzp.open();
+
 {% endif %}
+
 </script>
 {% endblock %}
