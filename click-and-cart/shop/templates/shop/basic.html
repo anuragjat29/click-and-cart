@@ -38,8 +38,21 @@
         <form class="d-flex" method="get" action="/shop/search/" role="search">
           <input class="form-control me-2" name="search" id="search" type="search" placeholder="Search" aria-label="Search">
           <button class="btn btn-outline-success" type="submit">Search</button>
-        </form>
-        <button type="button" id="popcart" class="btn btn-secondary mx-2" data-bs-container="body" data-bs-toggle="popover" data-bs-placement="bottom" data-bs-html="true" data-bs-content="Right popover">
+        </form >
+        {% if request.user.is_authenticated %}
+            <form class="d-flex mx-1" method="POST" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">
+                    Logout
+                </button>
+            </form>
+        {% else %}
+            <a class="btn btn-outline-success" href="{% url 'login' %}">Login</a>
+
+        {% endif %}
+
+
+        <button type="button" id="popcart" class="btn btn-secondary mx-1" data-bs-container="body" data-bs-toggle="popover" data-bs-placement="bottom" data-bs-html="true" data-bs-content="Right popover">
   cart<span id="cart">0</span>
 </button>
 

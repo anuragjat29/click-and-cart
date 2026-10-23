@@ -203,6 +203,46 @@ var rzp = new Razorpay(options);
 
 rzp.open();
 
+
+
+var rzp = new Razorpay(options);
+
+// Handle a failed payment
+rzp.on('payment.failed', function (response) {
+    const paymentId = response.error.metadata?.payment_id;
+
+    if (!paymentId) {
+        alert("Payment failed. Please check your order status.");
+        return;
+    }
+
+    fetch("{% url 'handlepaymentfailure' %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": "{{ csrf_token }}"
+        },
+        body: JSON.stringify({
+            order_id: "{{ order_id }}",
+            razorpay_payment_id: paymentId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === "failed") {
+            alert("Payment failed. Your order status has been updated.");
+        } else {
+            alert("Payment failed, but we couldn't update the order status. Please check your orders.");
+        }
+    })
+    .catch(error => {
+        console.error("Payment failure update error:", error);
+        alert("Payment failed. Please check your order status.");
+    });
+});
+
+rzp.open();
+
 {% endif %}
 
 </script>

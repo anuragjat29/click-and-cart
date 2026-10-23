@@ -43,7 +43,7 @@ DEBUG = True
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
 ALLOWED_HOSTS = []
 
-
+LOGIN_URL = '/accounts/login/'
 # Application definition
 
 INSTALLED_APPS = [
@@ -54,7 +54,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'blog'
+    'blog',
+    'accounts'
 ]
 
 MIDDLEWARE = [

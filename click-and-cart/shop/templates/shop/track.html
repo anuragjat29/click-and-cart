@@ -11,9 +11,22 @@
            <form method="POST" action="{% url 'trackingstatus' %}">
             {% csrf_token %}
             <div class="row">
-                <div class="form-group col-md-6">
-                    <label for="inputname"> Order Id</label>
-                    <input type="text" class="form-control" id="orderid" name="orderid" placeholder="Order Id">
+                <div class="form-group col-md-6 mt-4">
+                    <select  name="orderid" id="orderid"
+                         class="form-control" required>
+                        <option value="">-- Select an Order --</option>
+
+                        {% for order in order_ids %}
+                            <option value="{{ order.orders_id }}"
+                                {% if selected_order and selected_order.orders_id == order.orders_id %}
+                                    selected
+                                {% endif %}>
+                                Order #{{ order.orders_id }} -
+                                ₹{{ order.amount }} -
+                                {{ order.status }}
+                            </option>
+                        {% endfor %}
+                    </select>
                 </div>
                 <div class="col-md-6">
                     <label for="inputEmail4"> Email</label>

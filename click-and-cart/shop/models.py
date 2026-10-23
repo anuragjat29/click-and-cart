@@ -1,5 +1,8 @@
+from tkinter.constants import CASCADE
+
 from django.db import models
 from django.utils.timezone import now
+from django.contrib.auth.models import User
 
 #Create your models here.
 class product(models.Model):
@@ -27,12 +30,14 @@ class contact(models.Model):
         return self.name
 
 class orders(models.Model):
+      user = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True, related_name="orders")
+      razorpay_order_id = models.CharField(default="")
       orders_id = models.AutoField(primary_key=True)
       name = models.CharField(max_length=30)
       gmail = models.CharField(max_length=50)
       amount = models.CharField(max_length=50,default="")
       address1 = models.CharField(max_length=100)
-      address2 = models.CharField(max_length=100)
+      address2 = models.CharField(max_length=100,blank=True)
       city = models.CharField(max_length=30)
       state = models.CharField(max_length=30)
       zip_code = models.CharField(max_length=10)

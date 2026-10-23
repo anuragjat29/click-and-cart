@@ -1,6 +1,7 @@
 import paytmchecksum
 from django.shortcuts import render
 from django.http import HttpResponse, JsonResponse
+from django.contrib.auth.decorators import login_required
 # from unicodedata import category
 import json
 import razorpay
@@ -105,15 +106,19 @@ def get_cart_products(request):
 
     return render(request, 'shop/contact.html')
 
+@login_required
 def track(request):
+    order_ids = orders.objects.filter(user=request.user)
+    print(order_ids)
     if request.method == "POST":
         order_id = request.POST.get("orderid","")
+        print(order_id,"f")
         gmail = request.POST.get("gmail","")
         updates = []
         orderitemdetails = []
-        if(order_id != "" and gmail != ""):
+        if(order_id != ""):
             order = orders.objects.filter(orders_id = order_id,
-                                        gmail=gmail)
+                                        user=request.user)
             if(order.exists()):
                 orderupdates = orderupdate.objects.filter(order = order[0])
                 orderitem = orderitems.objects.filter(order=order[0])
@@ -133,9 +138,9 @@ def track(request):
 
         if(len(updates) == 0):
             updates.append({"desc":'Sorry, We are not able to fetch this order for this id and email. Make sure to type correct order Id and email'})
-        return render(request, 'shop/track.html',{"orderupdates":updates, "orderitems":orderitemdetails})
+        return render(request, 'shop/track.html',{"orderupdates":updates, "orderitems":orderitemdetails ,"order_ids":order_ids})
 
-    return render(request, 'shop/track.html')
+    return render(request, 'shop/track.html',{"order_ids":order_ids})
 
 
 def productview(request,myid):
@@ -143,8 +148,10 @@ def productview(request,myid):
     return render(request,'shop/productview.html',{'product':prod[0]})
 
 
+@login_required
 def checkout(request):
     if(request.method == "POST"):
+        user = request.user
         name = request.POST.get("name","")
         gmail = request.POST.get("email","")
         address1 = request.POST.get("address1","")
@@ -156,11 +163,12 @@ def checkout(request):
         cart = request.POST.get("cart","")
         cart = json.loads(cart)
         status="Pending"
-        order = orders(name=name, gmail=gmail, address1=address1, address2=address2,amount=0, city=city, state=state, zip_code=zipcode, phone=phone,status=status)
+        order = orders(user=user, name=name, gmail=gmail, address1=address1, address2=address2,amount=0, city=city, state=state, zip_code=zipcode, phone=phone,status=status)
         order.save()
 
-        # order_updates = orderupdate(order=order, order_desc="Pending")
-        # order_updates.save()
+
+        order_updates = orderupdate(order=order, order_desc="Pending")
+        order_updates.save()
 
         amount = 0
         for id in cart:
@@ -172,16 +180,15 @@ def checkout(request):
             orderitem = orderitems(order=order, product=product_name, price=price, qty=qty)
             orderitem.save()
 
-        order.amount = amount
-        order.save()
 
         razorpay_order = client.order.create({
                 "amount": amount * 100,   # Razorpay uses paise
                 "currency": "INR",
                 "receipt": str(order.orders_id)
         })
-        print(razorpay_order)
-        print(razorpay_order["id"])
+        order.razorpay_order_id = razorpay_order['id']
+        order.amount = amount
+        order.save()
 
         return render(
             request,
@@ -244,10 +251,78 @@ def handlerequest(request):
         except Exception as e:
 
             print("RAZORPAY VERIFICATION ERROR:", e)
-
             return JsonResponse({
                 "status": "failed"
             })
 
 
+@csrf_exempt
+@login_required
+def handlepaymentfailure(request):
+    if request.method != "POST":
+        return JsonResponse({"status": "invalid_method"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        order_id = data.get("order_id")
+        payment_id = data.get("razorpay_payment_id")
+
+        if not order_id or not payment_id:
+            return JsonResponse({"status": "missing_data"}, status=400)
+
+        # Only allow the logged-in user to update their own order
+        order = orders.objects.get(
+            orders_id=order_id,
+            user=request.user
+        )
+
+        # Ensure this order is linked to Razorpay
+        if not order.razorpay_order_id:
+            return JsonResponse(
+                {"status": "razorpay_order_not_linked"},
+                status=400
+            )
+
+        # Fetch payment details directly from Razorpay
+        payment = client.payment.fetch(payment_id)
+
+        # Confirm the payment belongs to this order
+        if payment.get("order_id") != order.razorpay_order_id:
+            return JsonResponse({"status": "order_mismatch"}, status=400)
+
+        # Only mark it failed if Razorpay confirms failure
+        if payment.get("status") != "failed":
+            return JsonResponse(
+                {"status": "payment_not_failed"},
+                status=400
+            )
+
+        # Never overwrite a successful payment
+        if order.status == "Paid":
+            return JsonResponse({"status": "already_paid"}, status=409)
+
+        # Avoid duplicate tracking updates
+        if order.status != "Failed":
+            order.status = "Failed"
+            order.save()
+
+            orderupdate.objects.create(
+                order=order,
+                order_desc="Payment Failed"
+            )
+
+        return JsonResponse({
+            "status": "failed",
+            "order_id": order.orders_id
+        })
+
+    except orders.DoesNotExist:
+        return JsonResponse({"status": "order_not_found"}, status=404)
+
+    except Exception as e:
+        print("PAYMENT FAILURE ERROR:", e)
+        return JsonResponse(
+            {"status": "verification_error"},
+            status=400
+        )
 
